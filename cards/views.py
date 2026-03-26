@@ -6,6 +6,8 @@ from django.contrib import messages
 from django.core.paginator import Paginator
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+import boto3
+import os
 
 from .forms import (
     CardImageUploadForm,
@@ -48,6 +50,10 @@ def _save_images(card: KnowledgeCard, files) -> None:
     existing = card.images.first()
     if existing:
         existing.image.delete(save=False)
+
+        if(os.getenv("USE_S3", "0") == "1"):
+            s3 = boto3.client('s3')
+            s3.delete_object(os.getenv("AWS_STORAGE_BUCKET_NAME"), Key=existing.image.image_url)
         existing.image = uploaded
         existing.original_filename = uploaded.name
         existing.average_hash = ""
