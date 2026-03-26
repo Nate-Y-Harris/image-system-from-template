@@ -1,20 +1,8 @@
 from __future__ import annotations
+from django.db.models import Q
 
 
 def apply_keyword_search(queryset, keyword: str):
-    final_cardset = []
+    final_cardset = queryset.filter(Q(tags__icontains=keyword) | Q(summary__icontains=keyword) | Q(description__icontains=keyword) | Q(title__icontains=keyword))  
     # Tags
-    for card in queryset:
-        if keyword in card.tags:
-            final_cardset.append(card)
-            break
-        if keyword in card.summary:
-            final_cardset.append(card)
-            break
-        if keyword in card.description:
-            final_cardset.append(card)
-            break
-        if keyword in card.title:
-            final_cardset.append(card)
-            break
     return final_cardset
