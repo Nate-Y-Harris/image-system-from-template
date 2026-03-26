@@ -46,6 +46,7 @@ class CardImage(models.Model):
     original_filename = models.CharField(max_length=255)
     average_hash = models.CharField(max_length=64, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    histogram = models.CharField(max_length=512)
 
     class Meta:
         ordering = ["created_at"]

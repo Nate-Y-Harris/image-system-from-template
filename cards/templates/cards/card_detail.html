@@ -52,6 +52,7 @@
     <ul class="meta-list">
       <li>Created: {{ card.created_at|date:'Y-m-d H:i' }}</li>
       <li>Updated: {{ card.updated_at|date:'Y-m-d H:i' }}</li>
+      <li>Histogram: {{ card.histogram }}</li>
       {% if card.images.first %}
       <li>Main Storage Key: {{ card.images.first.storage_key }}</li>
       {% endif %}

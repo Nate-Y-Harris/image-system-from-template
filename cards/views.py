@@ -37,12 +37,14 @@ def _apply_sort(queryset, sort: str):
 
 
 def _save_images(card: KnowledgeCard, files) -> None:
-    # TODO(student): implement image save/replace logic for one-primary-image policy.
+    #TODO(student): implement image save/replace logic for one-primary-image policy.
     # HINT: take files[0], compute histogram signature, then upsert CardImage for this card.
-    # Default fallback keeps app runnable but does not compute signatures.
+
+    
     if not files:
         return
     uploaded = files[0]
+    uploaded_sig = compute_color_histogram_signature(uploaded)
     existing = card.images.first()
     if existing:
         existing.image.delete(save=False)
@@ -50,12 +52,14 @@ def _save_images(card: KnowledgeCard, files) -> None:
         existing.original_filename = uploaded.name
         existing.average_hash = ""
         existing.save(update_fields=["image", "original_filename", "average_hash"])
+        existing.histogram = uploaded_sig,
     else:
         CardImage.objects.create(
             card=card,
             image=uploaded,
             original_filename=uploaded.name,
             average_hash="",
+            histogram=uploaded_sig,
         )
 
 
@@ -147,6 +151,40 @@ def image_search(request: HttpRequest) -> HttpResponse:
     # 1) iterate CardImage rows with non-empty signatures
     # 2) call compare_image_similarity(query_signature, stored_signature)
     # 3) keep best score per card, sort desc, return top IMAGE_TOP_K
+
+    cards = CardImage.objects.filter(image__isnull=False)
+    scores = []
+    for card in cards:
+        card_sig = card.histogram
+        score = (compare_image_similarity(query_signature, card_sig))
+        scores.append((score, card.card))
+    scores.sort(reverse=True)
+    print(scores)
+    ordered_cards = [t[1] for t in scores]
+    print(ordered_cards)
+    paginator = Paginator(ordered_cards, 9)
+    page_obj = paginator.get_page(request.GET.get("page"))
+    match_scores = {t[1].id: t[0] for t in scores}
+    match_ranks = {t[1].id: idx + 1 for idx,t in enumerate(scores)}
+    if (len(scores) > 3):
+        context = {
+                "form": form,
+                "image_form": image_form,
+                "page_obj": page_obj,
+                "result_count": paginator.count,
+                "query": "",
+                "sort": "relevance",
+                "active_nav": "browse",
+                "image_search_mode": True,
+                "match_scores": match_scores,
+                "match_ranks": match_ranks,
+                "image_search_meta": {
+                    "query_name": getattr(query_image, "name", "uploaded image"),
+                    "top_k": IMAGE_TOP_K,
+                    },
+                }
+        return render(request, "cards/browse_cards.html", context)
+
     # Default fallback: first 3 cards with images, all scores 0.
     ordered_cards = list(KnowledgeCard.objects.prefetch_related("images").filter(images__isnull=False).distinct()[:IMAGE_TOP_K])
     match_scores = {card.id: 0.0 for card in ordered_cards}
@@ -156,21 +194,21 @@ def image_search(request: HttpRequest) -> HttpResponse:
     page_obj = paginator.get_page(request.GET.get("page"))
 
     context = {
-        "form": form,
-        "image_form": image_form,
-        "page_obj": page_obj,
-        "result_count": paginator.count,
-        "query": "",
-        "sort": "relevance",
-        "active_nav": "browse",
-        "image_search_mode": True,
-        "match_scores": match_scores,
-        "match_ranks": match_ranks,
-        "image_search_meta": {
-            "query_name": getattr(query_image, "name", "uploaded image"),
-            "top_k": IMAGE_TOP_K,
-        },
-    }
+            "form": form,
+            "image_form": image_form,
+            "page_obj": page_obj,
+            "result_count": paginator.count,
+            "query": "",
+            "sort": "relevance",
+            "active_nav": "browse",
+            "image_search_mode": True,
+            "match_scores": match_scores,
+            "match_ranks": match_ranks,
+            "image_search_meta": {
+                "query_name": getattr(query_image, "name", "uploaded image"),
+                "top_k": IMAGE_TOP_K,
+                },
+            }
     return render(request, "cards/browse_cards.html", context)
 
 
@@ -178,10 +216,10 @@ def card_detail(request: HttpRequest, card_id: int) -> HttpResponse:
     card = get_object_or_404(KnowledgeCard.objects.prefetch_related("images"), id=card_id)
     image_upload_form = CardImageUploadForm()
     context = {
-        "card": card,
-        "active_nav": "browse",
-        "image_upload_form": image_upload_form,
-    }
+            "card": card,
+            "active_nav": "browse",
+            "image_upload_form": image_upload_form,
+            }
     return render(request, "cards/card_detail.html", context)
 
 
